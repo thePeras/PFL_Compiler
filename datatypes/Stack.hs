@@ -1,4 +1,4 @@
-module Stack ( Stack, push, pop, top, empty, isEmpty  ) where
+module Stack ( Stack, push, pop, top, createEmptyStack, isEmpty, stack2Str) where
 
 data Stack a = Stk [a]
 
@@ -13,9 +13,12 @@ top :: Stack a -> a
 top (Stk (x:_)) = x
 top _ = error "Stack.top: empty stack"
 
-empty :: Stack a
-empty = Stk []
+createEmptyStack :: Stack a
+createEmptyStack = Stk []
 
 isEmpty :: Stack a -> Bool
 isEmpty (Stk [])= True
 isEmpty (Stk _) = False
+
+stack2Str :: Stack -> String
+-- TODO

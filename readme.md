@@ -23,14 +23,14 @@ Instructions of the machine:
 
 # TO DO LIST PART 1
 
-[ ] (a) Define a new type to represent the machine’s stack. The type must be named Stack.
+[X] (a) Define a new type to represent the machine’s stack. The type must be named Stack.
 
-[ ] (b) Define a new type to represent the machine’s state. The type must be named State.
+[X] (b) Define a new type to represent the machine’s state. The type must be named State.
 
-[ ] (c) Implement the createEmptyStack function which returns an empty machine’s stack.
+[X] (c) Implement the createEmptyStack function which returns an empty machine’s stack.
     ```createEmptyStack :: Stack```
 
-[ ] (d) Implement the createEmptyState function which returns an empty machine’s state.
+[X] (d) Implement the createEmptyState function which returns an empty machine’s state.
     ```createEmptyState :: State```
 
 [ ] (e) Implement the ```stack2Str``` function which converts a stack given as input to a string.
