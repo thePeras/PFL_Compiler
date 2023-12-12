@@ -2,6 +2,7 @@
 module State (State, createEmptyState, insertValue, readValue, state2Str) where
 
 import qualified Data.Map as Map
+import Data.List (intercalate)
 
 newtype State = State { getState :: Map.Map String Integer }
 
@@ -17,9 +18,10 @@ readValue key (State state) =
     Just value -> value
     Nothing    -> error "No value found for the given key"
 
-state2Str :: State -> String
-state2Str (State state) = Map.foldrWithKey (\key value acc -> key ++ "=" ++ show value ++ "," ++ acc) "" state
 
+-- TODO: Make a custom
+state2Str :: State -> String
+state2Str (State state) = intercalate "," $ map (\(key, value) -> key ++ "=" ++ show value) (Map.toList state)
 
 -- Documentation:
 

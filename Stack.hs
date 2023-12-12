@@ -1,4 +1,4 @@
-module Stack (Stack, push, pop, top, createEmptyStack, isEmpty, stack2Str, stack2StrRec) where
+module Stack (Stack, push, pop, top, createEmptyStack, isEmpty, stack2Str) where
 
 data Stack = Stk [Integer]
 
@@ -21,8 +21,6 @@ isEmpty (Stk []) = True
 isEmpty (Stk _) = False
 
 stack2Str :: Stack -> String
-stack2Str (Stk stack) = foldr (\x acc -> show x ++ "," ++ acc) "" stack
-
-stack2StrRec :: Stack -> String
-stack2StrRec (Stk []) = ""
-stack2StrRec (Stk (x:xs)) = show x ++ "," ++ stack2StrRec (Stk xs)
+stack2Str (Stk []) = ""
+stack2Str (Stk [x]) = show x
+stack2Str (Stk (x:xs)) = show x ++ "," ++ stack2Str (Stk xs)
