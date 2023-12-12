@@ -33,18 +33,18 @@ Instructions of the machine:
 [X] (d) Implement the createEmptyState function which returns an empty machine’s state.
     ```createEmptyState :: State```
 
-[ ] (e) Implement the ```stack2Str``` function which converts a stack given as input to a string.
+[X] (e) Implement the ```stack2Str``` function which converts a stack given as input to a string.
     The string represents the stack as an ordered list of values, separated by commas
     and without spaces, with the leftmost value representing the top of the stack.
     ```stack2Str :: Stack → String```
     For instance, after executing the code [push−42, true, false], the string representing
     the stack is: False,True,42.
 
-[ ] (f) Implement the state2Str function which converts a machine state given as input to a string. The string represents the state as an list of pairs variable-value, separated by commas and without spaces, with the pairs ordered in alphabetical order of the variable name. Each variable-value pair is represented without spaces and using an ”=”.
+[X] (f) Implement the state2Str function which converts a machine state given as input to a string. The string represents the state as an list of pairs variable-value, separated by commas and without spaces, with the pairs ordered in alphabetical order of the variable name. Each variable-value pair is represented without spaces and using an ”=”.
     state2Str :: State → String
 For instance, after executing the code [false, push − 3, true, store − var, store −a, store−someV ar], the string representing the state is: a=3,someVar=False,var=True.
 
-[ ] (g) Write an interpreter for programs in the same machine, which given a list of in-
+[X] (g) Write an interpreter for programs in the same machine, which given a list of in-
 structions (type defined as Code, i.e. type Code = [Inst]), a stack (type defined as
 Stack) and that is initially empty, and a storage (type defined as State), runs the
 list of instructions returning as ouput an empty code list, a stack and the output
