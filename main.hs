@@ -87,23 +87,57 @@ runTests =
 
 -- Part 2
 
--- TODO: Define the types Aexp, Bexp, Stm and Program
--- • Aexp for arithmetic expressions
--- • Bexp for boolean expressions
--- • Stm for statements
--- • Program is just a list of statemets: [Stm]
+-- Arithmetic expressions
+data Aexp = Num Int                -- Constants
+          | Var String             -- Variables
+          | Add Aexp Aexp
+          | Sub Aexp Aexp
+          | Mul Aexp Aexp
+          deriving (Show)
 
--- compA :: Aexp -> Code
-compA = undefined -- TODO
+-- Boolean expressions
+data Bexp = TrueB                   -- True constant
+          | FalseB                  -- False constant
+          | Eq Aexp Aexp            -- Equality
+          | Not Bexp                -- Logical NOT
+          deriving (Show)
 
--- compB :: Bexp -> Code
-compB = undefined -- TODO
+-- Statements
+data Stm = Assign String Aexp      -- Assignment: x := a
+         | Seq Stm Stm             -- Sequence: stm1; stm2
+         | If Bexp Stm Stm         -- If-Else statement
+         | While Bexp Stm          -- While loop
+         deriving (Show)
 
--- compile :: Program -> Code
-compile = undefined -- TODO
+-- Program
+type Program = [Stm]
 
--- parse :: String -> Program
-parse = undefined -- TODO
+-- Ex: x + 1 is [push−1, fetch−x, add]
+compA :: Aexp -> Code
+compA (Num n)     = [Push n]
+compA (Var x)     = [Fetch x]
+compA (Add x y)   = compA y ++ compA x ++ [Add]
+compA (Sub x y)   = compA y ++ compA x ++ [Sub]
+compA (Mul x y)   = compA y ++ compA x ++ [Mul]
+
+compB :: Bexp -> Code
+compB TrueB         = [Tru]
+compB FalseB        = [Fals]
+compB (Eq x y)      = compA x ++ compA y ++ [Eq]
+compB (Le x y)      = compA x ++ compA y ++ [Le]
+compB (And x y)     = compB y ++ compB x ++ [And]
+compB (Not x)       = compB x ++ [Neg]
+
+compile :: Stm -> Code
+compile (Assign x a)      = compA a ++ [Store x]
+compile (Seq stm1 stm2)   = compile stm1 ++ compile stm2
+compile (If b stm1 stm2)  = compB b ++ [Branch (compile stm1) (compile stm2)]
+compile (While b stm)     = [Loop (compB b ++ compile stm)]
+compile _                 = error $ "Run-time error"
+
+parse :: String -> Program
+parse = map parseStm statements
+  where statements = words . filter (/= ';')
 
 -- To help you test your parser
 testParser :: String -> (String, String)
