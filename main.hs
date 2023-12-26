@@ -124,7 +124,7 @@ data Bexp = TrueExp                   -- True constant
 data Stm = Assign String Aexp      -- Assignment: x := a
          | Seq Stm Stm             -- Sequence: stm1; stm2
          | If String String String         -- If-Else statement
-         | While Bexp Stm          -- While loop
+         | While String String          -- While loop
          | Testing 
          deriving (Show)
 
@@ -154,7 +154,7 @@ compile (stm:stms) = compileStm stm ++ compile stms
 compileStm :: Stm -> Code
 compileStm (Assign x a)      = compA a ++ [Store x]
 compileStm (Seq stm1 stm2)   = compileStm stm1 ++ compileStm stm2
-compileStm (While cond stm)     = [Loop (compB cond ++ compileStm stm) []]
+--compileStm (While cond stm)     = [Loop (compB cond ++ compileStm stm) []]
 --compileStm (If cond stm1 stm2)  = compB cond ++ [Branch (compileStm stm1) (compileStm stm2)]
 
 wordsOn :: (Char -> Bool) -> String -> [String]
@@ -164,25 +164,30 @@ wordsOn p s =  case dropWhile p s of
                             where (w, s'') = break p s'
 
 parse :: String -> Program
-parse programCode = parseStms $ wordsOn (== ';') programCode
+-- TODO: This needs to split only the ; outside the () and not the ones inside
+-- parse "while (not(x < 2)) do (x := x + 1;);" not working
+parse programCode = parseStm $ map words $ wordsOn (== ';') programCode
 
-parseStms :: [String] -> Program
-parseStms [] = []
-parseStms (stm:stms) = if isIfStm 
-  then parseIfStm stm stms 
-  else parseStm stm : parseStms stms
-  where isIfStm = head (words stm) == "if"
+parseStm :: [[String]] -> Program
+parseStm [] = []
 
--- This is the only parser that consumes two statements
-parseIfStm :: String -> [String] -> Program
-parseIfStm stm1 (stm2:stms) = [If cond code1 code2] ++ parseStms stms
-  where cond = (unwords (takeWhile (/= "then") stm1WithoutIf))
-        stm1WithoutIf = drop 1 (words stm1)
-        code1 = (unwords (dropWhile (/= "then") (words stm1)))
-        code2 = (unwords (dropWhile (/= "else") (words stm2)))
+-- If Statements
+parseStm (("if":stm1):("else":stm2):stms) = [If cond code1 code2] ++ parseStm stms
+  where cond = (unwords (takeWhile (/= "then") stm1))
+        code1 = (unwords (drop 1 $ dropWhile (/= "then") stm1))
+        code2 = unwords stm2
+parseStm (("if":stm1):stms) = error $ "Run-time error: Invalid if statement"
 
-parseStm :: String -> Stm
-parseStm stm = Testing
+-- While Statements
+parseStm (("while":stm1):stms) = [While cond code] ++ parseStm stms
+  where cond = (unwords (takeWhile (/= "do") stm1))
+        code = (unwords (drop 1 $ dropWhile (/= "do") stm1)) -- parseStms if ";" exists here or parseStm otherwise
+
+-- Assign Statements
+-- parseStm ((x:":=":xs):stms) = [Assign x (parseAexp xs)] ++ parseStm stms
+
+parseStm _ = error $ "Run-time error: Invalid statement"
+
 
 --parse programCode = parseStm $ splitBy ';' programCode
 
