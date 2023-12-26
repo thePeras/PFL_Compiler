@@ -14,9 +14,7 @@ tt = 1
 
 operation :: (Integer -> Integer -> Integer) -> Stack -> Stack
 operation op stack =
-  let x = top stack
-      y = top (pop stack)
-      stackWithoutXY = pop (pop stack)
+  let (x, y, stackWithoutXY) = top2 stack
       result = x `op` y
       newStack = push result stackWithoutXY
   in newStack
@@ -34,9 +32,17 @@ run ((Add : xs), stack, state) = run (xs, operation (+) stack, state)
 run ((Mult : xs), stack, state) = run (xs, operation (*) stack, state)
 run ((Sub : xs), stack, state) = run (xs, operation (-) stack, state)
 
--- TODO: Check this (maybe remove operation)
-run ((Equ : xs), stack, state) = run (xs, operation (\x y -> if x == y then 1 else 0) stack, state)
-run ((Le : xs), stack, state) = run (xs, operation (\x y -> if x <= y then 1 else 0) stack, state)
+-- Equ compare the top two values of the stack for equality
+-- Equ works with Integers and Booleans
+run ((Equ : xs), stack, state) = run (xs, newStack, state)
+  where newStack = push result stackWithoutXY
+        result = equInst x y
+        (x, y, stackWithoutXY) = top2 stack
+
+run ((Le : xs), stack, state) = run (xs, newStack, state)
+  where newStack = push result stackWithoutXY
+        result = leInst x y
+        (x, y, stackWithoutXY) = top2 stack
 
 run ((Push value : xs), stack, state) = run (xs, push value stack, state)
 run ((Tru : xs), stack, state) = run (xs, push tt stack, state)
@@ -60,6 +66,16 @@ run ((Loop code1 code2 : xs), stack, state) =
 -- TODO: This is wrong
 run ((And : xs), stack, state) = run (xs, operation (\x y -> if x == 1 && y == 1 then 1 else 0) stack, state)
 run ((Neg : xs), stack, state) = run (xs, operation (\x y -> if x == 1 then 0 else 1) stack, state)
+
+-- Less or Equal only works wit Integers
+leInst :: Integer -> Integer -> Integer -- Change last Integer to Bool/Boolean
+leInst x y = if x <= y then tt else ff
+
+-- Equation instructions works with Integers and Booleans
+equInst :: Integer -> Integer -> Integer -- Change last Integer to Bool/Boolean
+equInst x y = if x == y then tt else ff
+--equInst :: Bool -> Bool -> Integer
+--equInst x y = if x == y then tt else ff
 
 -- To help you test your assembler
 testAssembler :: Code -> (String, String)
