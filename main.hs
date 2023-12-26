@@ -66,8 +66,8 @@ testAssembler :: Code -> (String, String)
 testAssembler code = (stack2Str stack, state2Str state)
   where (_,stack,state) = run(code, createEmptyStack, createEmptyState)
 
-runTests :: Bool
-runTests = 
+--runTests :: Bool
+--runTests = 
   -- testAssembler [Push 10,Push 4,Push 3,Sub,Mult] == ("-10","")
   -- testAssembler [Fals,Push 3,Tru,Store "var",Store "a", Store "someVar"] == ("","a=3,someVar=False,var=True")
   -- testAssembler [Fals,Store "var",Fetch "var"] == ("False","var=False")
@@ -88,18 +88,20 @@ runTests =
 -- Part 2
 
 -- Arithmetic expressions
-data Aexp = Num Int                -- Constants
+data Aexp = Num Integer                -- Constants
           | Var String             -- Variables
-          | Add Aexp Aexp
-          | Sub Aexp Aexp
-          | Mul Aexp Aexp
+          | AddExp Aexp Aexp
+          | SubExp Aexp Aexp
+          | MultExp Aexp Aexp
           deriving (Show)
 
 -- Boolean expressions
-data Bexp = TrueB                   -- True constant
-          | FalseB                  -- False constant
-          | Eq Aexp Aexp            -- Equality
-          | Not Bexp                -- Logical NOT
+data Bexp = TrueExp                   -- True constant
+          | FalseExp                  -- False constant
+          | EquExp Aexp Aexp            -- Equality
+          | LeExp Aexp Aexp            -- Less or equal
+          | AndExp Bexp Bexp           -- Logical AND
+          | NotExp Bexp                -- Logical NOT
           deriving (Show)
 
 -- Statements
@@ -116,33 +118,79 @@ type Program = [Stm]
 compA :: Aexp -> Code
 compA (Num n)     = [Push n]
 compA (Var x)     = [Fetch x]
-compA (Add x y)   = compA y ++ compA x ++ [Add]
-compA (Sub x y)   = compA y ++ compA x ++ [Sub]
-compA (Mul x y)   = compA y ++ compA x ++ [Mul]
+compA (AddExp x y)   = compA y ++ compA x ++ [Add]
+compA (SubExp x y)   = compA y ++ compA x ++ [Sub]
+compA (MultExp x y)   = compA y ++ compA x ++ [Mult]
 
 compB :: Bexp -> Code
-compB TrueB         = [Tru]
-compB FalseB        = [Fals]
-compB (Eq x y)      = compA x ++ compA y ++ [Eq]
-compB (Le x y)      = compA x ++ compA y ++ [Le]
-compB (And x y)     = compB y ++ compB x ++ [And]
-compB (Not x)       = compB x ++ [Neg]
+compB TrueExp         = [Tru]
+compB FalseExp        = [Fals]
+compB (EquExp x y)      = compA x ++ compA y ++ [Equ]
+compB (LeExp x y)      = compA x ++ compA y ++ [Le]
+compB (AndExp x y)     = compB y ++ compB x ++ [And] -- This can be wrong
+compB (NotExp x)       = compB x ++ [Neg]
 
-compile :: Stm -> Code
-compile (Assign x a)      = compA a ++ [Store x]
-compile (Seq stm1 stm2)   = compile stm1 ++ compile stm2
-compile (If b stm1 stm2)  = compB b ++ [Branch (compile stm1) (compile stm2)]
-compile (While b stm)     = [Loop (compB b ++ compile stm)]
-compile _                 = error $ "Run-time error"
+compile :: Program -> Code
+compile [] = []
+compile (stm:stms) = compileStm stm ++ compile stms
+
+compileStm :: Stm -> Code
+compileStm (Assign x a)      = compA a ++ [Store x]
+compileStm (Seq stm1 stm2)   = compileStm stm1 ++ compileStm stm2
+compileStm (While b stm)     = [Loop (compB b ++ compileStm stm) []]
+compileStm (If b stm1 stm2)  = compB b ++ [Branch (compileStm stm1) (compileStm stm2)]
 
 parse :: String -> Program
-parse = map parseStm statements
-  where statements = words . filter (/= ';')
+parse programCode = []
+--parse programCode = parseStm $ splitBy ';' programCode
+
+--parseStm :: [String] -> Program
+--parseStm [] = error $ "Run-time error"
+--parseStm [stm] = [parseStm' (words stm)]
+--parseStm (stm1:stms) = parseStm' (words stm1) ++ parseStm stms
+
+--parseStm' :: [String] -> Stm
+--parseStm' [] = error $ "Run-time error"
+--parseStm' (x:":=":xs) = Assign x (parseAexp' xs)
+--parseStm' ("while":xs) = While cond code
+--  where cond = parseBexp xs
+--        code = parseStm' stm
+--        stm = dropWhile (/= "do") xs
+-- while (not(i == 1)) do (fact := fact * i; i := i - 1;)
+-- [while, (not(i, ==, 1)), do, (fact, :=, fact, *, i;, i, :=, i, -, 1;)])]    
+--parseStm' ('if':xs) = If (parseBexp xs) (parseStm' stm1) (parseStm' stm2)
+
+--parseAexp :: String -> Aexp
+--parseAexp str = parseAexp' (words str)
+
+--parseAexp' :: [String] -> Aexp
+--parseAexp' [] = error $ "Run-time error"
+--parseAexp' [x] = Var x
+--parseAexp' (x:"+":xs) = AddExp (parseAexp x) (parseAexp' xs)
+--parseAexp' (x:"-":xs) = SubExp (parseAexp x) (parseAexp' xs)
+--parseAexp' (x:"*":xs) = MultExp (parseAexp x) (parseAexp' xs)
+
+--parseBexp :: String -> Bexp
+--parseBexp str = parseBexp' (words str)
+
+--parseBexp' :: [String] -> Bexp
+--parseBexp' [] = error $ "Run-time error"
+--parseBexp' [x] = Var x
+--parseBexp' ("not":xs) = NotExp (parseBexp' xs)
+--parseBexp' (x:"and":xs) = AndExp (parseBexp x) (parseBexp' xs)
+--parseBexp' (x:"<=":xs) = LeExp (parseAexp x) (parseAexp' xs)
+--parseBexp' (x:"==":xs) = EquExp (parseAexp x) (parseAexp' xs)
+
+--splitBy :: Char -> String -> [String]
+--splitBy _ [] = []
+--splitBy c str = first : splitBy c rest
+--  where first = takeWhile (/= c) str
+--        rest = drop (length first + 1) str
 
 -- To help you test your parser
 testParser :: String -> (String, String)
-testParser programCode = (stack2Str stack, store2Str store)
-  where (_,stack,store) = run(compile (parse programCode), createEmptyStack, createEmptyStore)
+testParser programCode = (stack2Str stack, state2Str state)
+  where (_,stack,state) = run(compile (parse programCode), createEmptyStack, createEmptyState)
 
 -- Examples:
 -- testParser "x := 5; x := x - 1;" == ("","x=4")
