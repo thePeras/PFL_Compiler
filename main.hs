@@ -123,8 +123,9 @@ data Bexp = TrueExp                   -- True constant
 -- Statements
 data Stm = Assign String Aexp      -- Assignment: x := a
          | Seq Stm Stm             -- Sequence: stm1; stm2
-         | If Bexp Stm Stm         -- If-Else statement
+         | If String String String         -- If-Else statement
          | While Bexp Stm          -- While loop
+         | Testing 
          deriving (Show)
 
 -- Program
@@ -153,11 +154,36 @@ compile (stm:stms) = compileStm stm ++ compile stms
 compileStm :: Stm -> Code
 compileStm (Assign x a)      = compA a ++ [Store x]
 compileStm (Seq stm1 stm2)   = compileStm stm1 ++ compileStm stm2
-compileStm (While b stm)     = [Loop (compB b ++ compileStm stm) []]
-compileStm (If b stm1 stm2)  = compB b ++ [Branch (compileStm stm1) (compileStm stm2)]
+compileStm (While cond stm)     = [Loop (compB cond ++ compileStm stm) []]
+--compileStm (If cond stm1 stm2)  = compB cond ++ [Branch (compileStm stm1) (compileStm stm2)]
+
+wordsOn :: (Char -> Bool) -> String -> [String]
+wordsOn p s =  case dropWhile p s of
+                      "" -> []
+                      s' -> w : wordsOn p s''
+                            where (w, s'') = break p s'
 
 parse :: String -> Program
-parse programCode = []
+parse programCode = parseStms $ wordsOn (== ';') programCode
+
+parseStms :: [String] -> Program
+parseStms [] = []
+parseStms (stm:stms) = if isIfStm 
+  then parseIfStm stm stms 
+  else parseStm stm : parseStms stms
+  where isIfStm = head (words stm) == "if"
+
+-- This is the only parser that consumes two statements
+parseIfStm :: String -> [String] -> Program
+parseIfStm stm1 (stm2:stms) = [If cond code1 code2] ++ parseStms stms
+  where cond = (unwords (takeWhile (/= "then") stm1WithoutIf))
+        stm1WithoutIf = drop 1 (words stm1)
+        code1 = (unwords (dropWhile (/= "then") (words stm1)))
+        code2 = (unwords (dropWhile (/= "else") (words stm2)))
+
+parseStm :: String -> Stm
+parseStm stm = Testing
+
 --parse programCode = parseStm $ splitBy ';' programCode
 
 --parseStm :: [String] -> Program
