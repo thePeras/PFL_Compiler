@@ -3,6 +3,7 @@ import State
 import Data.Char (isDigit, isAlpha)
 import Data.Maybe (fromJust)
 import Data.List (groupBy)
+import Control.Applicative ((<|>))
 
 data Inst =
   Push Integer | Add | Mult | Sub | Tru | Fals | Equ | Le | And | Neg | Fetch String | Store String | Noop |
@@ -147,7 +148,7 @@ compB TrueExp         = [Tru]
 compB FalseExp        = [Fals]
 compB (EquExp x y)      = compA x ++ compA y ++ [Equ]
 compB (LeExp x y)      = compA x ++ compA y ++ [Le]
-compB (AndExp x y)     = compB y ++ compB x ++ [And] -- This can be wrong
+compB (AndExp x y)     = compB y ++ compB x ++ [And]
 compB (NotExp x)       = compB x ++ [Neg]
 
 compile :: Program -> Code
@@ -269,6 +270,50 @@ parseAexp tokens = do
       (right, remaining) <- parseAexp t
       return (SubExp left right, remaining)
     _ -> return (left, rest)
+
+parseBexp :: [Token] -> Maybe (Bexp, [Token])
+parseBexp tokens@(TLParen : _) = do
+  (exp, rest) <- parseBexp (tail tokens) -- Ignore the TLParen and parse the expression inside
+  case rest of
+    (TRParen : remaining) -> return (exp, remaining)
+    _ -> Nothing -- Missing closing parenthesis
+parseBexp (TTrue : remaining) = Just (TrueExp, remaining)
+parseBexp (TFalse : remaining) = Just (FalseExp, remaining)
+parseBexp tokens = parseAndExp tokens
+
+parseAndExp :: [Token] -> Maybe (Bexp, [Token])
+parseAndExp tokens = do
+  (left, rest) <- parseNotExp tokens
+  case rest of
+    (TAnd : t) -> do
+      (right, remaining) <- parseAndExp t
+      return (AndExp left right, remaining)
+    _ -> return (left, rest)
+
+parseNotExp :: [Token] -> Maybe (Bexp, [Token])
+parseNotExp (TNot : tokens) = do
+  (exp, rest) <- parseBexp tokens -- Allow "not" to apply to whole expressions
+  return (NotExp exp, rest)
+parseNotExp tokens = parseRelationalExp tokens
+
+parseRelationalExp :: [Token] -> Maybe (Bexp, [Token])
+parseRelationalExp tokens@(TLParen : _) = parseBexp tokens -- If the expression starts with a parenthesis, parse it directly
+parseRelationalExp tokens = do
+  (left, rest) <- parseAexp tokens
+  case rest of
+    (TEqu : t) -> do
+      (right, remaining) <- parseAexp t
+      return (EquExp left right, remaining)
+    (TLe : t) -> do
+      (right, remaining) <- parseAexp t
+      return (LeExp left right, remaining)
+    _ -> Nothing -- Invalid relational expression
+
+-- Still not working:
+-- parseBexp (lexer "False and True")
+-- parseBexp (lexer "True and 2==2")
+-- boolean equality (=) ps: what is the difference between that and logical conjunction (and) ?
+
 
 -- To help you test your parser
 testParser :: String -> (String, String)
