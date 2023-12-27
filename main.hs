@@ -1,5 +1,8 @@
 import Stack
 import State
+import Data.Char (isDigit, isAlpha)
+import Data.Maybe (fromJust)
+import Data.List (groupBy)
 
 data Inst =
   Push Integer | Add | Mult | Sub | Tru | Fals | Equ | Le | And | Neg | Fetch String | Store String | Noop |
@@ -184,55 +187,88 @@ parseStm (("while":stm1):stms) = [While cond code] ++ parseStm stms
         code = (unwords (drop 1 $ dropWhile (/= "do") stm1)) -- parseStms if ";" exists here or parseStm otherwise
 
 -- Assign Statements
--- parseStm ((x:":=":xs):stms) = [Assign x (parseAexp xs)] ++ parseStm stms
+parseStm ((x:":=":xs):stms) =
+  case parsedXs of
+    Just (parsedExpr, _) -> Assign x parsedExpr : parseStm stms
+    Nothing -> error "Parsing arithmetic expression failed"
+  where
+    parsedXs = parseAexp (lexer (unwords xs))
 
 parseStm _ = error $ "Run-time error: Invalid statement"
 
+-- Tokenize
+data Token = TInt Integer
+           | TVar String
+           | TPlus
+           | TMinus
+           | TMult
+           | TLParen
+           | TRParen
+           | TTrue
+           | TFalse
+           | TEqu
+           | TLe
+           | TAnd
+           | TNot
+           deriving (Show, Eq)
 
---parse programCode = parseStm $ splitBy ';' programCode
+lexer :: String -> [Token]
+lexer [] = []
+lexer input@(c:cs)
+  | isDigit c = let (num, restNum) = span isDigit input
+                in TInt (read num) : lexer restNum
+  | isAlpha c = case keyword of
+                  "and" -> TAnd : lexer restKeyword
+                  "not" -> TNot : lexer restKeyword
+                  "True" -> TTrue : lexer restKeyword
+                  "False" -> TFalse : lexer restKeyword
+                  _     -> TVar var : lexer restVar
+  | c == '+' = TPlus : lexer cs
+  | c == '-' = TMinus : lexer cs
+  | c == '*' = TMult : lexer cs
+  | c == '(' = TLParen : lexer cs
+  | c == ')' = TRParen : lexer cs
+  | c == '=' && not (null cs) && c2 == '=' = TEqu : lexer newCs
+  | c == '<' && not (null cs) && c2 == '=' = TLe : lexer newCs
+  | otherwise = lexer cs -- Ignoring spaces, for example
+  where (var, restVar) = span isAlpha input
+        (keyword, restKeyword) = span isAlpha input
+        (c2:newCs) = cs
 
---parseStm :: [String] -> Program
---parseStm [] = error $ "Run-time error"
---parseStm [stm] = [parseStm' (words stm)]
---parseStm (stm1:stms) = parseStm' (words stm1) ++ parseStm stms
 
---parseStm' :: [String] -> Stm
---parseStm' [] = error $ "Run-time error"
---parseStm' (x:":=":xs) = Assign x (parseAexp' xs)
---parseStm' ("while":xs) = While cond code
---  where cond = parseBexp xs
---        code = parseStm' stm
---        stm = dropWhile (/= "do") xs
--- while (not(i == 1)) do (fact := fact * i; i := i - 1;)
--- [while, (not(i, ==, 1)), do, (fact, :=, fact, *, i;, i, :=, i, -, 1;)])]    
---parseStm' ('if':xs) = If (parseBexp xs) (parseStm' stm1) (parseStm' stm2)
+parseInt :: [Token] -> Maybe (Aexp, [Token])
+parseInt (TInt n : restTokens) = Just (Num n, restTokens)
+parseInt _ = Nothing
 
---parseAexp :: String -> Aexp
---parseAexp str = parseAexp' (words str)
+parseFactor :: [Token] -> Maybe (Aexp, [Token])
+parseFactor (TLParen : tokens) =
+  case parseAexp tokens of
+    Just (exp, TRParen : restTokens) -> Just (exp, restTokens)
+    _ -> Nothing
+parseFactor (TInt n : restTokens) = Just (Num n, restTokens)
+parseFactor (TVar x : restTokens) = Just (Var x, restTokens)
+parseFactor _ = Nothing
 
---parseAexp' :: [String] -> Aexp
---parseAexp' [] = error $ "Run-time error"
---parseAexp' [x] = Var x
---parseAexp' (x:"+":xs) = AddExp (parseAexp x) (parseAexp' xs)
---parseAexp' (x:"-":xs) = SubExp (parseAexp x) (parseAexp' xs)
---parseAexp' (x:"*":xs) = MultExp (parseAexp x) (parseAexp' xs)
+parseTerm :: [Token] -> Maybe (Aexp, [Token])
+parseTerm tokens = do
+  (left, rest) <- parseFactor tokens
+  case rest of
+    (TMult : t) -> do
+      (right, remaining) <- parseTerm t
+      return (MultExp left right, remaining)
+    _ -> return (left, rest)
 
---parseBexp :: String -> Bexp
---parseBexp str = parseBexp' (words str)
-
---parseBexp' :: [String] -> Bexp
---parseBexp' [] = error $ "Run-time error"
---parseBexp' [x] = Var x
---parseBexp' ("not":xs) = NotExp (parseBexp' xs)
---parseBexp' (x:"and":xs) = AndExp (parseBexp x) (parseBexp' xs)
---parseBexp' (x:"<=":xs) = LeExp (parseAexp x) (parseAexp' xs)
---parseBexp' (x:"==":xs) = EquExp (parseAexp x) (parseAexp' xs)
-
---splitBy :: Char -> String -> [String]
---splitBy _ [] = []
---splitBy c str = first : splitBy c rest
---  where first = takeWhile (/= c) str
---        rest = drop (length first + 1) str
+parseAexp :: [Token] -> Maybe (Aexp, [Token])
+parseAexp tokens = do
+  (left, rest) <- parseTerm tokens
+  case rest of
+    (TPlus : t) -> do
+      (right, remaining) <- parseAexp t
+      return (AddExp left right, remaining)
+    (TMinus : t) -> do
+      (right, remaining) <- parseAexp t
+      return (SubExp left right, remaining)
+    _ -> return (left, rest)
 
 -- To help you test your parser
 testParser :: String -> (String, String)
