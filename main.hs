@@ -108,29 +108,28 @@ testAssembler code = (stack2Str stack, state2Str state)
 -- Part 2
 
 -- Arithmetic expressions
-data Aexp = Num Integer                -- Constants
-          | Var String             -- Variables
+data Aexp = Num Integer
+          | Var String
           | AddExp Aexp Aexp
           | SubExp Aexp Aexp
           | MultExp Aexp Aexp
           deriving (Show)
 
 -- Boolean expressions
-data Bexp = TrueExp                   -- True constant
-          | FalseExp                  -- False constant
-          | EquExp Aexp Aexp            -- Equality
-          | EquBoolExp Bexp Bexp        -- Boolean equality
-          | LeExp Aexp Aexp            -- Less or equal
-          | AndExp Bexp Bexp           -- Logical AND
-          | NotExp Bexp                -- Logical NOT
+data Bexp = TrueExp
+          | FalseExp
+          | EquExp Aexp Aexp -- Equality
+          | EquBoolExp Bexp Bexp  -- Boolean equality
+          | LeExp Aexp Aexp
+          | AndExp Bexp Bexp
+          | NotExp Bexp
           deriving (Show)
 
 -- Statements
-data Stm = Assign String Aexp      -- Assignment: x := a
-         | Seq Stm Stm             -- Sequence: stm1; stm2
-         | If String String String         -- If-Else statement
-         | While String String          -- While loop
-         | Testing 
+data Stm = Assign String Aexp
+         | If Bexp Stm Stm
+         | While Bexp Stm
+         | Seq Stm Stm -- Sequence: stm1; stm2
          deriving (Show)
 
 -- Program
@@ -160,44 +159,14 @@ compile (stm:stms) = compileStm stm ++ compile stms
 compileStm :: Stm -> Code
 compileStm (Assign x a)      = compA a ++ [Store x]
 compileStm (Seq stm1 stm2)   = compileStm stm1 ++ compileStm stm2
---compileStm (While cond stm)     = [Loop (compB cond ++ compileStm stm) []]
---compileStm (If cond stm1 stm2)  = compB cond ++ [Branch (compileStm stm1) (compileStm stm2)]
+compileStm (While cond stm)     = [Loop (compB cond ++ compileStm stm) []]
+compileStm (If cond stm1 stm2)  = compB cond ++ [Branch (compileStm stm1) (compileStm stm2)]
 
 wordsOn :: (Char -> Bool) -> String -> [String]
 wordsOn p s =  case dropWhile p s of
                       "" -> []
                       s' -> w : wordsOn p s''
                             where (w, s'') = break p s'
-
-parse :: String -> Program
--- TODO: This needs to split only the ; outside the () and not the ones inside
--- parse "while (not(x < 2)) do (x := x + 1;);" not working
-parse programCode = parseStm $ map words $ wordsOn (== ';') programCode
-
-parseStm :: [[String]] -> Program
-parseStm [] = []
-
--- If Statements
-parseStm (("if":stm1):("else":stm2):stms) = [If cond code1 code2] ++ parseStm stms
-  where cond = (unwords (takeWhile (/= "then") stm1))
-        code1 = (unwords (drop 1 $ dropWhile (/= "then") stm1))
-        code2 = unwords stm2
-parseStm (("if":stm1):stms) = error $ "Run-time error: Invalid if statement"
-
--- While Statements
-parseStm (("while":stm1):stms) = [While cond code] ++ parseStm stms
-  where cond = (unwords (takeWhile (/= "do") stm1))
-        code = (unwords (drop 1 $ dropWhile (/= "do") stm1)) -- parseStms if ";" exists here or parseStm otherwise
-
--- Assign Statements
-parseStm ((x:":=":xs):stms) =
-  case parsedXs of
-    Just (parsedExpr, _) -> Assign x parsedExpr : parseStm stms
-    Nothing -> error "Parsing arithmetic expression failed"
-  where
-    parsedXs = parseAexp (lexer (unwords xs))
-
-parseStm _ = error $ "Run-time error: Invalid statement"
 
 -- Tokenize
 data Token = TInt Integer
@@ -214,6 +183,13 @@ data Token = TInt Integer
            | TLe
            | TAnd
            | TNot
+           | TAssign
+           | TSeq
+           | TIf
+           | TThen
+           | TElse
+           | TWhile
+           | TDo
            deriving (Show, Eq)
 
 lexer :: String -> [Token]
@@ -226,6 +202,11 @@ lexer input@(c:cs)
                   "not" -> TNot : lexer restKeyword
                   "True" -> TTrue : lexer restKeyword
                   "False" -> TFalse : lexer restKeyword
+                  "if" -> TIf : lexer restKeyword
+                  "then" -> TThen : lexer restKeyword
+                  "while" -> TWhile : lexer restKeyword
+                  "do" -> TDo : lexer restKeyword
+                  "else" -> TElse : lexer restKeyword
                   _     -> TVar var : lexer restVar
   | c == '+' = TPlus : lexer cs
   | c == '-' = TMinus : lexer cs
@@ -235,10 +216,61 @@ lexer input@(c:cs)
   | c == '=' && not (null cs) && c2 == '=' = TEqu : lexer newCs
   | c == '<' && not (null cs) && c2 == '=' = TLe : lexer newCs
   | c == '=' = TEquBool : lexer cs
+  | c == ':' && not (null cs) && c2 == '=' = TAssign : lexer newCs
+  | c == ';' = TSeq : lexer cs
+  -- here can exist TEnd if we want
   | otherwise = lexer cs -- Ignoring spaces, for example
   where (var, restVar) = span isAlpha input
         (keyword, restKeyword) = span isAlpha input
         (c2:newCs) = cs
+        (followWord, restFollowWord) = span isAlpha newCs
+
+parse :: String -> Program
+parse program = parseStm (lexer program)
+
+parseStm :: [Token] -> Program
+parseStm [] = []
+
+parseStm (TIf : t) =
+    case parseBexp cond of
+        Just (parsedCond, []) ->
+            let code1 = joinStms (parseStm t1)
+                code2 = joinStms (parseStm t2)
+            in If parsedCond code1 code2 : parseStm remaining
+        _ -> error "Run-time error: Invalid if statement"
+    where cond = takeWhile (/= TThen) t
+          -- code1 is between TThen and TElse
+          t11 = drop 1 $ dropWhile (/= TThen) t
+          t1 = takeWhile (/= TElse) t11
+          -- code2 is between TElse and TSeq
+          t22 = drop 1 $ dropWhile (/= TElse) t
+          t2 = takeWhile (/= TSeq) t22
+          remaining = drop 1 $ dropWhile (/= TSeq) t22
+
+parseStm (TWhile : t) =
+    case parseBexp cond of
+        Just (parsedCond, []) ->
+            let code1 = joinStms (parseStm code)
+            in While parsedCond code1 : parseStm remaining
+        _ -> error "Run-time error: Invalid while statement1"
+    where cond = takeWhile (/= TDo) t
+          -- code between TDo and TSeq -- Not correct as the do can have more than one statement
+          code = drop 1 $ dropWhile (/= TDo) t
+          remaining = drop 1 $ dropWhile (/= TSeq) t
+
+parseStm (TVar var : TAssign : t) =
+    case parseAexp t of
+        Just (parsedExpr, remaining) -> Assign var parsedExpr : parseStm remaining
+        _ -> error "Parsing arithmetic expression failed"
+
+parseStm (TSeq : t) = parseStm t
+
+parseStm x = error $ "Run-time error: Invalid statement in parseStm: " ++ show x
+
+joinStms :: [Stm] -> Stm
+joinStms [] = error "Run-time error: Invalid statement in joinStms"
+joinStms [stm] = stm
+joinStms (stm:stms) = Seq stm (joinStms stms)
 
 parseFactor :: [Token] -> Maybe (Aexp, [Token])
 parseFactor (TLParen : tokens) =
@@ -261,14 +293,17 @@ parseTerm tokens = do
 parseAexp :: [Token] -> Maybe (Aexp, [Token])
 parseAexp tokens = do
   (left, rest) <- parseTerm tokens
-  case rest of
-    (TPlus : t) -> do
-      (right, remaining) <- parseAexp t
-      return (AddExp left right, remaining)
-    (TMinus : t) -> do
-      (right, remaining) <- parseAexp t
-      return (SubExp left right, remaining)
-    _ -> return (left, rest)
+  parseAexpHelper left rest
+
+parseAexpHelper :: Aexp -> [Token] -> Maybe (Aexp, [Token])
+parseAexpHelper left [] = return (left, [])
+parseAexpHelper left (TPlus : t) = do
+  (right, remaining) <- parseTerm t
+  parseAexpHelper (AddExp left right) remaining
+parseAexpHelper left (TMinus : t) = do
+  (right, remaining) <- parseTerm t
+  parseAexpHelper (SubExp left right) remaining
+parseAexpHelper left t = return (left, t)
 
 parseBexp :: [Token] -> Maybe (Bexp, [Token])
 parseBexp tokens@(TLParen : _) = do
@@ -315,10 +350,12 @@ parseRelationalExp tokens = do
     _ -> Nothing -- Invalid relational expression
 
 
--- Still not working: (problems with parenthesis)
--- parseBexp (lexer "(2<=3) and (2 == 4)")
--- parseBexp (lexer "(2 <= 5 = 3 == 4) and (2 <= 2)")
-
+-- Still not working:
+-- (problems with parenthesis)
+--    ex: parseBexp (lexer "(2<=3) and (2 == 4)")
+--    ex: parseBexp (lexer "(2 <= 5 = 3 == 4) and (2 <= 2)")
+-- parse with () in codes of If and While
+--    ex: [error] of examples
 
 -- To help you test your parser
 testParser :: String -> (String, String)
@@ -328,8 +365,8 @@ testParser programCode = (stack2Str stack, state2Str state)
 -- Examples:
 -- testParser "x := 5; x := x - 1;" == ("","x=4")
 -- testParser "if (not True and 2 <= 5 = 3 == 4) then x :=1; else y := 2;" == ("","y=2")
--- testParser "x := 42; if x <= 43 then x := 1; else (x := 33; x := x+1;)" == ("","x=1")
+-- [error] testParser "x := 42; if x <= 43 then x := 1; else (x := 33; x := x+1;)" == ("","x=1")
 -- testParser "x := 42; if x <= 43 then x := 1; else x := 33; x := x+1;" == ("","x=2")
 -- testParser "x := 42; if x <= 43 then x := 1; else x := 33; x := x+1; z := x+x;" == ("","x=2,z=4")
 -- testParser "x := 2; y := (x - 3)*(4 + 2*3); z := x +x*(2);" == ("","x=2,y=-10,z=6")
--- testParser "i := 10; fact := 1; while (not(i == 1)) do (fact := fact * i; i := i - 1;);" == ("","fact=3628800,i=1")
+-- [error] testParser "i := 10; fact := 1; while (not(i == 1)) do (fact := fact * i; i := i - 1;);" == ("","fact=3628800,i=1")
