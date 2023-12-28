@@ -1,6 +1,8 @@
 import Stack
 import State
 
+-- Part 1
+
 data Inst =
   Push Integer | Add | Mult | Sub | Tru | Fals | Equ | Le | And | Neg | Fetch String | Store String | Noop |
   Branch Code Code | Loop Code Code
@@ -8,74 +10,96 @@ data Inst =
 
 type Code = [Inst]
 
--- True and False representations
-ff = 0
-tt = 1
+operator :: Inst -> (Code, Stack, State) -> (Code, Stack, State)
 
-operation :: (Integer -> Integer -> Integer) -> Stack -> Stack
-operation op stack =
-  let (x, y, stackWithoutXY) = top2 stack
-      result = x `op` y
-      newStack = push result stackWithoutXY
-  in newStack
+-- Push
+operator (Push x) (code, stack, state) = 
+  (code, IntElement x : stack, state)
 
--- TODO: Chamo a atenção que na primeira alínea do trabalho de Haskell a função run 
--- quando chamada com configurações erradas deve retornar a mensagem de erro: "Run-time error", 
--- chamando a função error $ "Run-time error".
--- Exemplo:
--- run([Push 1,Push 2,And], createEmptyStack, createEmptyState)
--- deve imprimir a mensagem de erro "Run-time error".
+-- Add
+operator Add (code, IntElement x : IntElement y : xs, state) = 
+  (code, IntElement (x+y) : xs, state)
+operator Add (code, stack, state) = error $ "Run-time error"
 
+-- Mult
+operator Mult (code, IntElement x : IntElement y : xs, state) = 
+  (code, IntElement (x*y) : xs, state)
+operator Mult (code, stack, state) = error $ "Run-time error"
+
+-- Sub
+operator Sub (code, IntElement x : IntElement y : xs, state) = 
+  (code, IntElement (x-y) : xs, state)
+operator Sub (code, stack, state) = error $ "Run-time error"
+
+-- Tru
+operator Tru (code, stack, state) = 
+  (code, BoolElement True : stack, state)
+
+-- Fals
+operator Fals (code, stack, state) = 
+  (code, BoolElement False : stack, state)
+
+-- Equ
+operator Equ (code, IntElement x : IntElement y : xs, state) = 
+  (code, BoolElement (x == y) : xs, state)
+operator Equ (code, BoolElement x : BoolElement y : xs, state) = 
+  (code, BoolElement (x == y) : xs, state)
+operator Equ (code, stack, state) = error $ "Run-time error"
+
+-- Le
+operator Le (code, IntElement x : IntElement y : xs, state) = 
+  (code, BoolElement (x <= y) : xs, state)
+operator Le (code, stack, state) 
+  = error $ "Run-time error"
+
+-- And
+operator And (code, BoolElement x : BoolElement y : xs, state) = 
+  (code, BoolElement (x && y) : xs, state)
+operator And (code, stack, state) = error $ "Run-time error"
+
+-- Neg
+operator Neg (code, BoolElement x : xs, state) = 
+  (code, BoolElement (not x) : xs, state)
+operator Neg (code, stack, state) = error $ "Run-time error"
+
+-- Fetch
+operator (Fetch key) (code, stack, state)
+  | valueIsInt = (code, value : stack, state)
+  | valueIsBool = (code, value : stack, state)
+  | otherwise = error "Run-time error"
+  where
+    value = readValue key state
+    valueIsInt = case value of
+      IntElement _ -> True
+      _ -> False
+    valueIsBool = case value of
+      BoolElement _ -> True
+      _ -> False
+
+-- Store
+operator (Store key) (code, value : stack, state) = 
+  (code, stack, insertValue key value state)
+
+-- Noop
+operator Noop (code, stack, state) = 
+  (code, stack, state)
+
+-- Branch
+operator (Branch code1 code2) (code, BoolElement x : xs, state)
+  | x = (code1 ++ code, xs, state)
+  | otherwise = (code2 ++ code, xs, state)
+operator (Branch code1 code2) (code, stack, state) = error $ "Run-time error"
+
+-- Loop
+operator (Loop c1 c2) (code, stack, state) =
+  (c1 ++ [Branch (c2 ++ [Loop c1 c2]) [Noop]], stack, state)
+
+  
 run :: (Code, Stack, State) -> (Code, Stack, State)
 run ([], stack, state) = ([], stack, state)
-run ((Add : xs), stack, state) = run (xs, operation (+) stack, state)
-run ((Mult : xs), stack, state) = run (xs, operation (*) stack, state)
-run ((Sub : xs), stack, state) = run (xs, operation (-) stack, state)
+run (x:xs, stack, state) = run (newCode, newStack, newState)
+  where (newCode, newStack, newState) = operator x (xs, stack, state)
 
--- Equ compare the top two values of the stack for equality
--- Equ works with Integers and Booleans
-run ((Equ : xs), stack, state) = run (xs, newStack, state)
-  where newStack = push result stackWithoutXY
-        result = equInst x y
-        (x, y, stackWithoutXY) = top2 stack
-
-run ((Le : xs), stack, state) = run (xs, newStack, state)
-  where newStack = push result stackWithoutXY
-        result = leInst x y
-        (x, y, stackWithoutXY) = top2 stack
-
-run ((Push value : xs), stack, state) = run (xs, push value stack, state)
-run ((Tru : xs), stack, state) = run (xs, push tt stack, state)
-run ((Fals : xs), stack, state) = run (xs, push ff stack, state)
-run ((Fetch key : xs), stack, state) = run (xs, push (readValue key state) stack, state)
-run ((Store key : xs), stack, state) = run (xs, pop stack, insertValue key (top stack) state)
-
-run ((Branch code1 code2 : xs), stack, state) =
-    case top stack of
-        0 -> run (code2 ++ xs, pop stack, state)
-        _ -> run (code1 ++ xs, pop stack, state)
-
-run ((Noop : xs), stack, state) = run (xs, stack, state)
-
--- TODO: this is wrong, ig
-run ((Loop code1 code2 : xs), stack, state) =
-    case top stack of
-        0 -> run (xs, pop stack, state)
-        _ -> run (code1 ++ [Loop code1 code2] ++ code2 ++ xs, pop stack, state)
-
--- TODO: This is wrong
-run ((And : xs), stack, state) = run (xs, operation (\x y -> if x == 1 && y == 1 then 1 else 0) stack, state)
-run ((Neg : xs), stack, state) = run (xs, operation (\x y -> if x == 1 then 0 else 1) stack, state)
-
--- Less or Equal only works wit Integers
-leInst :: Integer -> Integer -> Integer -- Change last Integer to Bool/Boolean
-leInst x y = if x <= y then tt else ff
-
--- Equation instructions works with Integers and Booleans
-equInst :: Integer -> Integer -> Integer -- Change last Integer to Bool/Boolean
-equInst x y = if x == y then tt else ff
---equInst :: Bool -> Bool -> Integer
---equInst x y = if x == y then tt else ff
 
 -- To help you test your assembler
 testAssembler :: Code -> (String, String)
@@ -99,7 +123,6 @@ testAssembler code = (stack2Str stack, state2Str state)
   -- If you test:
   -- testAssembler [Tru,Tru,Store "y", Fetch "x",Tru]
   -- You should get an exception with the string: "Run-time error"
-
 
 -- Part 2
 
