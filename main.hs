@@ -209,7 +209,7 @@ lexer input@(c:cs)
   | c == '=' = TEquBool : lexer cs
   | c == ':' && not (null cs) && c2 == '=' = TAssign : lexer newCs
   | c == ';' = TSeq : lexer cs
-  -- here can exist TEnd if we want
+  -- here can exist TEnd if we want know it is the last ;
   | otherwise = lexer cs -- Ignoring spaces, for example
   where (var, restVar) = span isAlpha input
         (keyword, restKeyword) = span isAlpha input
@@ -267,38 +267,38 @@ joinStms [] = error "Run-time error: Invalid statement in joinStms"
 joinStms [stm] = stm
 joinStms (stm:stms) = Seq stm (joinStms stms)
 
-parseFactor :: [Token] -> Maybe (Aexp, [Token])
-parseFactor (TLParen : tokens) =
-  case parseAexp tokens of
-    Just (exp, TRParen : restTokens) -> Just (exp, restTokens)
-    _ -> Nothing
-parseFactor (TInt n : restTokens) = Just (Num n, restTokens)
-parseFactor (TVar x : restTokens) = Just (Var x, restTokens)
-parseFactor _ = Nothing
+parseAexp :: [Token] -> Maybe (Aexp, [Token])
+parseAexp tokens = do
+  (left, rest) <- parseAexpOp tokens
+  parseAexpInReverse left rest
 
-parseTerm :: [Token] -> Maybe (Aexp, [Token])
-parseTerm tokens = do
-  (left, rest) <- parseFactor tokens
+parseAexpInReverse :: Aexp -> [Token] -> Maybe (Aexp, [Token])
+parseAexpInReverse left [] = return (left, [])
+parseAexpInReverse left (TPlus : t) = do
+  (right, remaining) <- parseAexpOp t
+  parseAexpInReverse (AddExp left right) remaining
+parseAexpInReverse left (TMinus : t) = do
+  (right, remaining) <- parseAexpOp t
+  parseAexpInReverse (SubExp left right) remaining
+parseAexpInReverse left t = return (left, t)
+
+parseAexpOp :: [Token] -> Maybe (Aexp, [Token])
+parseAexpOp tokens = do
+  (left, rest) <- parseAexpTerm tokens
   case rest of
     (TMult : t) -> do
-      (right, remaining) <- parseTerm t
+      (right, remaining) <- parseAexpOp t
       return (MultExp left right, remaining)
     _ -> return (left, rest)
 
-parseAexp :: [Token] -> Maybe (Aexp, [Token])
-parseAexp tokens = do
-  (left, rest) <- parseTerm tokens
-  parseAexpHelper left rest
-
-parseAexpHelper :: Aexp -> [Token] -> Maybe (Aexp, [Token])
-parseAexpHelper left [] = return (left, [])
-parseAexpHelper left (TPlus : t) = do
-  (right, remaining) <- parseTerm t
-  parseAexpHelper (AddExp left right) remaining
-parseAexpHelper left (TMinus : t) = do
-  (right, remaining) <- parseTerm t
-  parseAexpHelper (SubExp left right) remaining
-parseAexpHelper left t = return (left, t)
+parseAexpTerm :: [Token] -> Maybe (Aexp, [Token])
+parseAexpTerm (TLParen : tokens) =
+  case parseAexp tokens of
+    Just (exp, TRParen : restTokens) -> Just (exp, restTokens)
+    _ -> Nothing
+parseAexpTerm (TInt n : restTokens) = Just (Num n, restTokens)
+parseAexpTerm (TVar x : restTokens) = Just (Var x, restTokens)
+parseAexpTerm _ = Nothing
 
 parseBexp :: [Token] -> Maybe (Bexp, [Token])
 parseBexp tokens@(TLParen : _) = do
@@ -306,34 +306,34 @@ parseBexp tokens@(TLParen : _) = do
   case rest of
     (TRParen : remaining) -> return (exp, remaining)
     _ -> Nothing -- Missing closing parenthesis
-parseBexp tokens = parseAndExp tokens
+parseBexp tokens = parseRelationalBexp tokens
 
-parseAndExp :: [Token] -> Maybe (Bexp, [Token])
-parseAndExp tokens = do
-  (left, rest) <- parseNotExp tokens
-  parseAndExpHelper left rest
+parseRelationalBexp :: [Token] -> Maybe (Bexp, [Token])
+parseRelationalBexp tokens = do
+  (left, rest) <- parseBasicBexp tokens
+  parseRelationalBexpInReverse left rest
 
-parseAndExpHelper :: Bexp -> [Token] -> Maybe (Bexp, [Token])
-parseAndExpHelper left [] = return (left, [])
-parseAndExpHelper left (TEquBool : t) = do
-  (right, remaining) <- parseNotExp t
-  parseAndExpHelper (EquBoolExp left right) remaining
-parseAndExpHelper left (TAnd : t) = do
-  (right, remaining) <- parseNotExp t
-  parseAndExpHelper (AndExp left right) remaining
-parseAndExpHelper left t = return (left, t)
+parseRelationalBexpInReverse :: Bexp -> [Token] -> Maybe (Bexp, [Token])
+parseRelationalBexpInReverse left [] = return (left, [])
+parseRelationalBexpInReverse left (TAnd : t) = do
+  (right, remaining) <- parseBasicBexp t
+  parseRelationalBexpInReverse (AndExp left right) remaining
+parseRelationalBexpInReverse left (TEquBool : t) = do
+  (right, remaining) <- parseBasicBexp t
+  parseRelationalBexpInReverse (EquBoolExp left right) remaining
+parseRelationalBexpInReverse left t = return (left, t)
 
-parseNotExp :: [Token] -> Maybe (Bexp, [Token])
-parseNotExp (TNot : tokens) = do
-  (exp, rest) <- parseBexp tokens -- Allow "not" to apply to whole expressions
+parseBasicBexp :: [Token] -> Maybe (Bexp, [Token])
+parseBasicBexp (TTrue : tokens) = Just (TrueExp, tokens)
+parseBasicBexp (TFalse : tokens) = Just (FalseExp, tokens)
+parseBasicBexp (TNot : tokens) = do
+  (exp, rest) <- parseBexp tokens
   return (NotExp exp, rest)
-parseNotExp (TTrue : tokens) = Just (TrueExp, tokens)
-parseNotExp (TFalse : tokens) = Just (FalseExp, tokens)
-parseNotExp tokens = parseRelationalExp tokens
+parseBasicBexp tokens = parseRelationalAexp tokens
 
-parseRelationalExp :: [Token] -> Maybe (Bexp, [Token])
-parseRelationalExp tokens@(TLParen : _) = parseBexp tokens -- If the expression starts with a parenthesis, parse it directly
-parseRelationalExp tokens = do
+parseRelationalAexp :: [Token] -> Maybe (Bexp, [Token])
+parseRelationalAexp tokens@(TLParen : _) = parseBexp tokens -- If the expression starts with a parenthesis, parse it directly
+parseRelationalAexp tokens = do
   (left, rest) <- parseAexp tokens
   case rest of
     (TEqu : t) -> do
