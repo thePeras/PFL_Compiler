@@ -119,6 +119,7 @@ data Aexp = Num Integer                -- Constants
 data Bexp = TrueExp                   -- True constant
           | FalseExp                  -- False constant
           | EquExp Aexp Aexp            -- Equality
+          | EquBoolExp Bexp Bexp        -- Boolean equality
           | LeExp Aexp Aexp            -- Less or equal
           | AndExp Bexp Bexp           -- Logical AND
           | NotExp Bexp                -- Logical NOT
@@ -147,9 +148,10 @@ compB :: Bexp -> Code
 compB TrueExp         = [Tru]
 compB FalseExp        = [Fals]
 compB (EquExp x y)      = compA x ++ compA y ++ [Equ]
+compB (EquBoolExp x y) = compB x ++ compB y ++ [Equ]
 compB (LeExp x y)      = compA x ++ compA y ++ [Le]
 compB (AndExp x y)     = compB y ++ compB x ++ [And]
-compB (NotExp x)       = compB x ++ [Neg]
+compB (NotExp x)       = compB x ++ [Neg] 
 
 compile :: Program -> Code
 compile [] = []
@@ -207,6 +209,7 @@ data Token = TInt Integer
            | TRParen
            | TTrue
            | TFalse
+           | TEquBool
            | TEqu
            | TLe
            | TAnd
@@ -231,15 +234,11 @@ lexer input@(c:cs)
   | c == ')' = TRParen : lexer cs
   | c == '=' && not (null cs) && c2 == '=' = TEqu : lexer newCs
   | c == '<' && not (null cs) && c2 == '=' = TLe : lexer newCs
+  | c == '=' = TEquBool : lexer cs
   | otherwise = lexer cs -- Ignoring spaces, for example
   where (var, restVar) = span isAlpha input
         (keyword, restKeyword) = span isAlpha input
         (c2:newCs) = cs
-
-
-parseInt :: [Token] -> Maybe (Aexp, [Token])
-parseInt (TInt n : restTokens) = Just (Num n, restTokens)
-parseInt _ = Nothing
 
 parseFactor :: [Token] -> Maybe (Aexp, [Token])
 parseFactor (TLParen : tokens) =
@@ -277,23 +276,29 @@ parseBexp tokens@(TLParen : _) = do
   case rest of
     (TRParen : remaining) -> return (exp, remaining)
     _ -> Nothing -- Missing closing parenthesis
-parseBexp (TTrue : remaining) = Just (TrueExp, remaining)
-parseBexp (TFalse : remaining) = Just (FalseExp, remaining)
 parseBexp tokens = parseAndExp tokens
 
 parseAndExp :: [Token] -> Maybe (Bexp, [Token])
 parseAndExp tokens = do
   (left, rest) <- parseNotExp tokens
-  case rest of
-    (TAnd : t) -> do
-      (right, remaining) <- parseAndExp t
-      return (AndExp left right, remaining)
-    _ -> return (left, rest)
+  parseAndExpHelper left rest
+
+parseAndExpHelper :: Bexp -> [Token] -> Maybe (Bexp, [Token])
+parseAndExpHelper left [] = return (left, [])
+parseAndExpHelper left (TEquBool : t) = do
+  (right, remaining) <- parseNotExp t
+  parseAndExpHelper (EquBoolExp left right) remaining
+parseAndExpHelper left (TAnd : t) = do
+  (right, remaining) <- parseNotExp t
+  parseAndExpHelper (AndExp left right) remaining
+parseAndExpHelper left t = return (left, t)
 
 parseNotExp :: [Token] -> Maybe (Bexp, [Token])
 parseNotExp (TNot : tokens) = do
   (exp, rest) <- parseBexp tokens -- Allow "not" to apply to whole expressions
   return (NotExp exp, rest)
+parseNotExp (TTrue : tokens) = Just (TrueExp, tokens)
+parseNotExp (TFalse : tokens) = Just (FalseExp, tokens)
 parseNotExp tokens = parseRelationalExp tokens
 
 parseRelationalExp :: [Token] -> Maybe (Bexp, [Token])
@@ -309,10 +314,10 @@ parseRelationalExp tokens = do
       return (LeExp left right, remaining)
     _ -> Nothing -- Invalid relational expression
 
--- Still not working:
--- parseBexp (lexer "False and True")
--- parseBexp (lexer "True and 2==2")
--- boolean equality (=) ps: what is the difference between that and logical conjunction (and) ?
+
+-- Still not working: (problems with parenthesis)
+-- parseBexp (lexer "(2<=3) and (2 == 4)")
+-- parseBexp (lexer "(2 <= 5 = 3 == 4) and (2 <= 2)")
 
 
 -- To help you test your parser
