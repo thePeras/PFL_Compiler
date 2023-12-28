@@ -1,7 +1,7 @@
 module Stack (Stack, createEmptyStack, push, pop, top, top1, top2, isEmpty, stack2Str) where
 
 -- Definition of the StackElement type
-data StackElement = StackElement Integer | StackElementBool Bool
+data StackElement = IntElement Integer | BoolElement Bool
   deriving (Show, Eq)
 
 -- Definition of the Stack type
@@ -46,7 +46,11 @@ isEmpty :: Stack -> Bool
 isEmpty (Stack []) = True
 isEmpty (Stack _) = False
 
+showValue :: StackElement -> String
+showValue (IntElement x) = show x
+showValue (BoolElement x) = show x
+
 stack2Str :: Stack -> String
 stack2Str (Stack []) = ""
-stack2Str (Stack [x]) = show x
-stack2Str (Stack (x:xs)) = show x ++ "," ++ stack2Str (Stack xs)
+stack2Str (Stack [x]) = showValue x
+stack2Str (Stack (x:xs)) = showValue x ++ "," ++ stack2Str (Stack xs)
