@@ -1,30 +1,28 @@
 
-module State (State, createEmptyState) where
+module State (State, createEmptyState, insertValue, readValue, showVal, state2Str) where
 
 import qualified Data.Map as Map
 import Data.List (intercalate)
+import Stack
 
-data StateType = IntType Integer | BoolType Bool
-  deriving (Show, Eq)
-
-newtype State = State { getState :: Map.Map String StateType }
+newtype State = State { getState :: Map.Map String StackElement }
   deriving (Show, Eq)
 
 createEmptyState :: State
 createEmptyState = State Map.empty
 
-insertValue :: String -> StateType -> State -> State
+insertValue :: String -> StackElement -> State -> State
 insertValue key value (State state) = State $ Map.insert key value state
 
-readValue :: String -> State -> StateType
+readValue :: String -> State -> StackElement
 readValue key (State state) =
   case Map.lookup key state of
     Just value -> value
-    Nothing    -> error "No value found for the given key"
+    Nothing    -> error "Run-time error"
 
-showVal :: StateType -> String
-showVal (IntType x) = show x
-showVal (BoolType x) = show x
+showVal :: StackElement -> String
+showVal (IntElement x) = show x
+showVal (BoolElement x) = show x
 
 -- TODO: Make a custom
 state2Str :: State -> String

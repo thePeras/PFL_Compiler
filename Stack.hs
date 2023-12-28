@@ -1,26 +1,25 @@
-module Stack (Stack, createEmptyStack, push, pop, top, top1, top2, isEmpty, showValue, stack2Str) where
+module Stack (Stack, StackElement(..), createEmptyStack, push, pop, top, top1, top2, isEmpty, showValue, stack2Str) where
 
 -- Definition of the StackElement type
 data StackElement = IntElement Integer | BoolElement Bool
   deriving (Show, Eq)
 
 -- Definition of the Stack type
-data Stack = Stk [StackElement]
-  deriving (Show, Eq)
+type Stack = [StackElement]
 
 
 createEmptyStack :: Stack
-createEmptyStack = Stk []
+createEmptyStack = []
 
 push :: StackElement -> Stack -> Stack
-push x (Stk xs) = Stk (x:xs)
+push x xs = x:xs
 
 pop :: Stack -> Stack
-pop (Stk (_:xs)) = Stk xs
+pop (_:xs) = xs
 pop _ = error "Stack.pop: empty stack"
 
 top :: Stack -> StackElement
-top (Stk (x:_)) = x
+top (x:_) = x
 top _ = error "Stack.top: empty stack"
 
 -- Returns a tuple (x, stackWithoutX)
@@ -43,14 +42,14 @@ top2 stack = (x, y, stackWithoutXY)
         stackWithoutXY = pop (pop stack)
 
 isEmpty :: Stack -> Bool
-isEmpty (Stk []) = True
-isEmpty (Stk _) = False
+isEmpty [] = True
+isEmpty _ = False
 
 showValue :: StackElement -> String
 showValue (IntElement x) = show x
 showValue (BoolElement x) = show x
 
 stack2Str :: Stack -> String
-stack2Str (Stk []) = ""
-stack2Str (Stk [x]) = showValue x
-stack2Str (Stk (x:xs)) = showValue x ++ "," ++ stack2Str (Stk xs)
+stack2Str [] = ""
+stack2Str [x] = showValue x
+stack2Str (x:xs) = showValue x ++ "," ++ stack2Str xs
