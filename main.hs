@@ -1,9 +1,6 @@
 import Stack
 import State
 import Data.Char (isDigit, isAlpha)
-import Data.Maybe (fromJust)
-import Data.List (groupBy)
-import Control.Applicative ((<|>))
 
 data Inst =
   Push Integer | Add | Mult | Sub | Tru | Fals | Equ | Le | And | Neg | Fetch String | Store String | Noop |
@@ -162,12 +159,6 @@ compileStm (Seq stm1 stm2)   = compileStm stm1 ++ compileStm stm2
 compileStm (While cond stm)     = [Loop (compB cond ++ compileStm stm) []]
 compileStm (If cond stm1 stm2)  = compB cond ++ [Branch (compileStm stm1) (compileStm stm2)]
 
-wordsOn :: (Char -> Bool) -> String -> [String]
-wordsOn p s =  case dropWhile p s of
-                      "" -> []
-                      s' -> w : wordsOn p s''
-                            where (w, s'') = break p s'
-
 -- Tokenize
 data Token = TInt Integer
            | TVar String
@@ -228,6 +219,11 @@ lexer input@(c:cs)
 parse :: String -> Program
 parse program = parseStm (lexer program)
 
+-- This predicate returns (Code, remaing)
+getCode :: [Token] -> ([Token], [Token])
+getCode (TLParen : t) = (takeWhile (/= TRParen) t, drop 1 $ dropWhile (/= TRParen) t)
+getCode t = (takeWhile (/= TSeq) t, drop 1 $ dropWhile (/= TSeq) t)
+
 parseStm :: [Token] -> Program
 parseStm [] = []
 
@@ -240,12 +236,11 @@ parseStm (TIf : t) =
         _ -> error "Run-time error: Invalid if statement"
     where cond = takeWhile (/= TThen) t
           -- code1 is between TThen and TElse
-          t11 = drop 1 $ dropWhile (/= TThen) t
-          t1 = takeWhile (/= TElse) t11
-          -- code2 is between TElse and TSeq
+          t111 = drop 1 $ dropWhile (/= TThen) t
+          t11 = takeWhile (/= TElse) t111
+          (t1, _) = getCode t11 -- if there is stm1, stm2 without () inside the then, stm2 will be ignored
           t22 = drop 1 $ dropWhile (/= TElse) t
-          t2 = takeWhile (/= TSeq) t22
-          remaining = drop 1 $ dropWhile (/= TSeq) t22
+          (t2, remaining) = getCode t22
 
 parseStm (TWhile : t) =
     case parseBexp cond of
@@ -255,8 +250,8 @@ parseStm (TWhile : t) =
         _ -> error "Run-time error: Invalid while statement1"
     where cond = takeWhile (/= TDo) t
           -- code between TDo and TSeq -- Not correct as the do can have more than one statement
-          code = drop 1 $ dropWhile (/= TDo) t
-          remaining = drop 1 $ dropWhile (/= TSeq) t
+          t1 = drop 1 $ dropWhile (/= TDo) t
+          (code, remaining) = getCode t1
 
 parseStm (TVar var : TAssign : t) =
     case parseAexp t of
@@ -307,7 +302,7 @@ parseAexpHelper left t = return (left, t)
 
 parseBexp :: [Token] -> Maybe (Bexp, [Token])
 parseBexp tokens@(TLParen : _) = do
-  (exp, rest) <- parseBexp (tail tokens) -- Ignore the TLParen and parse the expression inside
+  (exp, rest) <- parseBexp (drop 1 $ tokens) -- Ignore the TLParen and parse the expression inside
   case rest of
     (TRParen : remaining) -> return (exp, remaining)
     _ -> Nothing -- Missing closing parenthesis
@@ -349,13 +344,9 @@ parseRelationalExp tokens = do
       return (LeExp left right, remaining)
     _ -> Nothing -- Invalid relational expression
 
-
--- Still not working:
 -- (problems with parenthesis)
 --    ex: parseBexp (lexer "(2<=3) and (2 == 4)")
 --    ex: parseBexp (lexer "(2 <= 5 = 3 == 4) and (2 <= 2)")
--- parse with () in codes of If and While
---    ex: [error] of examples
 
 -- To help you test your parser
 testParser :: String -> (String, String)
@@ -365,8 +356,8 @@ testParser programCode = (stack2Str stack, state2Str state)
 -- Examples:
 -- testParser "x := 5; x := x - 1;" == ("","x=4")
 -- testParser "if (not True and 2 <= 5 = 3 == 4) then x :=1; else y := 2;" == ("","y=2")
--- [error] testParser "x := 42; if x <= 43 then x := 1; else (x := 33; x := x+1;)" == ("","x=1")
+-- testParser "x := 42; if x <= 43 then x := 1; else (x := 33; x := x+1;)" == ("","x=1")
 -- testParser "x := 42; if x <= 43 then x := 1; else x := 33; x := x+1;" == ("","x=2")
 -- testParser "x := 42; if x <= 43 then x := 1; else x := 33; x := x+1; z := x+x;" == ("","x=2,z=4")
 -- testParser "x := 2; y := (x - 3)*(4 + 2*3); z := x +x*(2);" == ("","x=2,y=-10,z=6")
--- [error] testParser "i := 10; fact := 1; while (not(i == 1)) do (fact := fact * i; i := i - 1;);" == ("","fact=3628800,i=1")
+-- testParser "i := 10; fact := 1; while (not(i == 1)) do (fact := fact * i; i := i - 1;);" == ("","fact=3628800,i=1")
