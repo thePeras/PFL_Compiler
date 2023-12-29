@@ -92,8 +92,8 @@ operator (Branch code1 code2) (code, BoolElement x : xs, state)
 operator (Branch code1 code2) (code, stack, state) = error $ "Run-time error"
 
 -- Loop
-operator (Loop c1 c2) (code, stack, state) =
-  (c1 ++ [Branch (c2 ++ [Loop c1 c2]) [Noop]], stack, state)
+operator (Loop cond code1) (code, stack, state) =
+  (cond ++ [Branch (code1 ++ [Loop cond code1]) [Noop]], stack, state)
 
   
 run :: (Code, Stack, State) -> (Code, Stack, State)
@@ -155,31 +155,30 @@ data Stm = Assign String Aexp
 -- Program
 type Program = [Stm]
 
--- Ex: x + 1 is [push−1, fetch−x, add]
 compA :: Aexp -> Code
-compA (Num n)     = [Push n]
-compA (Var x)     = [Fetch x]
-compA (AddExp x y)   = compA y ++ compA x ++ [Add]
-compA (SubExp x y)   = compA y ++ compA x ++ [Sub]
+compA (Num n)         = [Push n]
+compA (Var x)         = [Fetch x]
+compA (AddExp x y)    = compA y ++ compA x ++ [Add]
+compA (SubExp x y)    = compA y ++ compA x ++ [Sub]
 compA (MultExp x y)   = compA y ++ compA x ++ [Mult]
 
 compB :: Bexp -> Code
-compB TrueExp         = [Tru]
-compB FalseExp        = [Fals]
-compB (EquExp x y)      = compA x ++ compA y ++ [Equ]
-compB (EquBoolExp x y) = compB x ++ compB y ++ [Equ]
-compB (LeExp x y)      = compA x ++ compA y ++ [Le]
-compB (AndExp x y)     = compB y ++ compB x ++ [And]
-compB (NotExp x)       = compB x ++ [Neg] 
+compB TrueExp           = [Tru]
+compB FalseExp          = [Fals]
+compB (EquExp x y)      = compA y ++ compA x ++ [Equ]
+compB (EquBoolExp x y)  = compB y ++ compB x ++ [Equ]
+compB (LeExp x y)       = compA y ++ compA x ++ [Le]
+compB (AndExp x y)      = compB y ++ compB x ++ [And]
+compB (NotExp x)        = compB x ++ [Neg] 
 
 compile :: Program -> Code
 compile [] = []
 compile (stm:stms) = compileStm stm ++ compile stms
 
 compileStm :: Stm -> Code
-compileStm (Assign x a)      = compA a ++ [Store x]
-compileStm (Seq stm1 stm2)   = compileStm stm1 ++ compileStm stm2
-compileStm (While cond stm)     = [Loop (compB cond ++ compileStm stm) []]
+compileStm (Assign x a)         = compA a ++ [Store x]
+compileStm (Seq stm1 stm2)      = compileStm stm1 ++ compileStm stm2
+compileStm (While cond stm)     = Loop (compB cond) (compileStm stm) : []
 compileStm (If cond stm1 stm2)  = compB cond ++ [Branch (compileStm stm1) (compileStm stm2)]
 
 -- Tokenize
@@ -232,7 +231,6 @@ lexer input@(c:cs)
   | c == '=' = TEquBool : lexer cs
   | c == ':' && not (null cs) && c2 == '=' = TAssign : lexer newCs
   | c == ';' = TSeq : lexer cs
-  -- here can exist TEnd if we want know it is the last ;
   | otherwise = lexer cs -- Ignoring spaces, for example
   where (var, restVar) = span isAlpha input
         (keyword, restKeyword) = span isAlpha input
@@ -253,28 +251,28 @@ parseStm [] = []
 parseStm (TIf : t) =
     case parseBexp cond of
         Just (parsedCond, []) ->
-            let code1 = joinStms (parseStm t1)
-                code2 = joinStms (parseStm t2)
+            let code1 = joinStms (parseStm extractedCode1)
+                code2 = joinStms (parseStm extractedCode2)
             in If parsedCond code1 code2 : parseStm remaining
         _ -> error "Run-time error: Invalid if statement"
     where cond = takeWhile (/= TThen) t
-          -- code1 is between TThen and TElse
-          t111 = drop 1 $ dropWhile (/= TThen) t
-          t11 = takeWhile (/= TElse) t111
-          (t1, _) = getCode t11 -- if there is stm1, stm2 without () inside the then, stm2 will be ignored
-          t22 = drop 1 $ dropWhile (/= TElse) t
-          (t2, remaining) = getCode t22
+          -- [(...) TThen (code1) TElse (code2)]
+          afterThen = drop 1 $ dropWhile (/= TThen) t
+          beforeElse = takeWhile (/= TElse) afterThen
+          (extractedCode1, _) = getCode beforeElse -- note: (...) then stm1; stm2; else (...) Without (), stm2 will be ignored
+          afterElse = drop 1 $ dropWhile (/= TElse) t
+          (extractedCode2, remaining) = getCode afterElse
 
 parseStm (TWhile : t) =
     case parseBexp cond of
         Just (parsedCond, []) ->
-            let code1 = joinStms (parseStm code)
-            in While parsedCond code1 : parseStm remaining
+            let code = joinStms (parseStm extractedCode)
+            in While parsedCond code : parseStm remaining
         _ -> error "Run-time error: Invalid while statement1"
     where cond = takeWhile (/= TDo) t
-          -- code between TDo and TSeq -- Not correct as the do can have more than one statement
-          t1 = drop 1 $ dropWhile (/= TDo) t
-          (code, remaining) = getCode t1
+          -- [(...) TDo (code)]
+          afterDo = drop 1 $ dropWhile (/= TDo) t
+          (extractedCode, remaining) = getCode afterDo
 
 parseStm (TVar var : TAssign : t) =
     case parseAexp t of
