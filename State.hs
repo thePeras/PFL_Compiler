@@ -1,10 +1,11 @@
 
-module State (State, createEmptyState, insertValue, readValue, showVal, state2Str) where
+module State (State, createEmptyState, insertValue, readValue, state2Str) where
 
 import qualified Data.Map as Map
 import Data.List (intercalate)
 import Stack
 
+-- Definition of the State type
 newtype State = State { getState :: Map.Map String StackElement }
   deriving (Show, Eq)
 
@@ -20,15 +21,12 @@ readValue key (State state) =
     Just value -> value
     Nothing    -> error "Run-time error"
 
-showVal :: StackElement -> String
-showVal (IntElement x) = show x
-showVal (BoolElement x) = show x
+showValue :: StackElement -> String
+showValue (IntElement x) = show x
+showValue (BoolElement x) = show x
 
--- TODO: Make a custom
 state2Str :: State -> String
-state2Str (State state) = intercalate "," $ map (\(key, value) -> key ++ "=" ++ showVal value) (Map.toList state)
-
-
+state2Str (State state) = intercalate "," $ map (\(key, value) -> key ++ "=" ++ showValue value) (Map.toList state)
 
 -- Documentation:
 
