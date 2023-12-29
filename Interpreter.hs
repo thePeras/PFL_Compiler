@@ -1,4 +1,4 @@
-module Interpreter (interprete, Inst(..), Code) where
+module Interpreter (interpret, Inst(..), Code) where
 
 import Stack
 import State
@@ -12,60 +12,60 @@ data Inst =
 -- Definition of the Code type
 type Code = [Inst]
 
-interprete :: Inst -> (Code, Stack, State) -> (Code, Stack, State)
+interpret :: Inst -> (Code, Stack, State) -> (Code, Stack, State)
 
 -- Push
-interprete (Push x) (code, stack, state) = 
+interpret (Push x) (code, stack, state) = 
   (code, IntElement x : stack, state)
 
 -- Add
-interprete Add (code, IntElement x : IntElement y : xs, state) = 
+interpret Add (code, IntElement x : IntElement y : xs, state) = 
   (code, IntElement (x+y) : xs, state)
-interprete Add (code, stack, state) = error $ "Run-time error"
+interpret Add (code, stack, state) = error $ "Run-time error"
 
 -- Mult
-interprete Mult (code, IntElement x : IntElement y : xs, state) = 
+interpret Mult (code, IntElement x : IntElement y : xs, state) = 
   (code, IntElement (x*y) : xs, state)
-interprete Mult (code, stack, state) = error $ "Run-time error"
+interpret Mult (code, stack, state) = error $ "Run-time error"
 
 -- Sub
-interprete Sub (code, IntElement x : IntElement y : xs, state) = 
+interpret Sub (code, IntElement x : IntElement y : xs, state) = 
   (code, IntElement (x-y) : xs, state)
-interprete Sub (code, stack, state) = error $ "Run-time error"
+interpret Sub (code, stack, state) = error $ "Run-time error"
 
 -- Tru
-interprete Tru (code, stack, state) = 
+interpret Tru (code, stack, state) = 
   (code, BoolElement True : stack, state)
 
 -- Fals
-interprete Fals (code, stack, state) = 
+interpret Fals (code, stack, state) = 
   (code, BoolElement False : stack, state)
 
 -- Equ
-interprete Equ (code, IntElement x : IntElement y : xs, state) = 
+interpret Equ (code, IntElement x : IntElement y : xs, state) = 
   (code, BoolElement (x == y) : xs, state)
-interprete Equ (code, BoolElement x : BoolElement y : xs, state) = 
+interpret Equ (code, BoolElement x : BoolElement y : xs, state) = 
   (code, BoolElement (x == y) : xs, state)
-interprete Equ (code, stack, state) = error $ "Run-time error"
+interpret Equ (code, stack, state) = error $ "Run-time error"
 
 -- Le
-interprete Le (code, IntElement x : IntElement y : xs, state) = 
+interpret Le (code, IntElement x : IntElement y : xs, state) = 
   (code, BoolElement (x <= y) : xs, state)
-interprete Le (code, stack, state) 
+interpret Le (code, stack, state) 
   = error $ "Run-time error"
 
 -- And
-interprete And (code, BoolElement x : BoolElement y : xs, state) = 
+interpret And (code, BoolElement x : BoolElement y : xs, state) = 
   (code, BoolElement (x && y) : xs, state)
-interprete And (code, stack, state) = error $ "Run-time error"
+interpret And (code, stack, state) = error $ "Run-time error"
 
 -- Neg
-interprete Neg (code, BoolElement x : xs, state) = 
+interpret Neg (code, BoolElement x : xs, state) = 
   (code, BoolElement (not x) : xs, state)
-interprete Neg (code, stack, state) = error $ "Run-time error"
+interpret Neg (code, stack, state) = error $ "Run-time error"
 
 -- Fetch
-interprete (Fetch key) (code, stack, state)
+interpret (Fetch key) (code, stack, state)
   | valueIsInt = (code, value : stack, state)
   | valueIsBool = (code, value : stack, state)
   | otherwise = error "Run-time error"
@@ -79,19 +79,19 @@ interprete (Fetch key) (code, stack, state)
       _ -> False
 
 -- Store
-interprete (Store key) (code, value : stack, state) = 
+interpret (Store key) (code, value : stack, state) = 
   (code, stack, insertValue key value state)
 
 -- Noop
-interprete Noop (code, stack, state) = 
+interpret Noop (code, stack, state) = 
   (code, stack, state)
 
 -- Branch
-interprete (Branch code1 code2) (code, BoolElement x : xs, state)
+interpret (Branch code1 code2) (code, BoolElement x : xs, state)
   | x = (code1 ++ code, xs, state)
   | otherwise = (code2 ++ code, xs, state)
-interprete (Branch code1 code2) (code, stack, state) = error $ "Run-time error"
+interpret (Branch code1 code2) (code, stack, state) = error $ "Run-time error"
 
 -- Loop
-interprete (Loop cond code1) (code, stack, state) =
+interpret (Loop cond code1) (code, stack, state) =
   (cond ++ [Branch (code1 ++ [Loop cond code1]) [Noop]], stack, state)
