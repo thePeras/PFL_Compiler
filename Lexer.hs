@@ -1,5 +1,5 @@
 
-module Lexer (lexer, Token(..)) where
+module Lexer where
 
 import Data.Char (isDigit, isAlpha)
 

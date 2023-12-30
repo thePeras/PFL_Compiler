@@ -1,4 +1,4 @@
-module Interpreter (interpret, Inst(..), Code) where
+module Interpreter where
 
 import Stack
 import State

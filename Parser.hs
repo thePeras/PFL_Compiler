@@ -1,4 +1,4 @@
-module Parser (parse) where
+module Parser where
 
 import Compiler(Aexp(..), Bexp(..), Stm(..), Program)
 import Lexer
@@ -93,28 +93,37 @@ parseBexp tokens@(TLParen : _) = do
   case rest of
     (TRParen : remaining) -> return (exp, remaining)
     _ -> Nothing -- Missing closing parenthesis
-parseBexp tokens = parseRelationalBexp tokens
+parseBexp tokens = parseAndExp tokens
 
-parseRelationalBexp :: [Token] -> Maybe (Bexp, [Token])
-parseRelationalBexp tokens = do
+parseAndExp :: [Token] -> Maybe (Bexp, [Token])
+parseAndExp tokens = do
+  (left, rest) <- parseEquBoolExp tokens
+  parseAndExpInReverse left rest
+
+parseAndExpInReverse :: Bexp -> [Token] -> Maybe (Bexp, [Token])
+parseAndExpInReverse left [] = return (left, [])
+parseAndExpInReverse left (TAnd : t) = do
+  (right, remaining) <- parseEquBoolExp t
+  parseAndExpInReverse (AndExp left right) remaining
+parseAndExpInReverse left t = return (left, t)
+
+parseEquBoolExp :: [Token] -> Maybe (Bexp, [Token])
+parseEquBoolExp tokens = do
   (left, rest) <- parseBasicBexp tokens
-  parseRelationalBexpInReverse left rest
+  parseEquBoolExpInReverse left rest
 
-parseRelationalBexpInReverse :: Bexp -> [Token] -> Maybe (Bexp, [Token])
-parseRelationalBexpInReverse left [] = return (left, [])
-parseRelationalBexpInReverse left (TAnd : t) = do
+parseEquBoolExpInReverse :: Bexp -> [Token] -> Maybe (Bexp, [Token])
+parseEquBoolExpInReverse left [] = return (left, [])
+parseEquBoolExpInReverse left (TEquBool : t) = do
   (right, remaining) <- parseBasicBexp t
-  parseRelationalBexpInReverse (AndExp left right) remaining
-parseRelationalBexpInReverse left (TEquBool : t) = do
-  (right, remaining) <- parseBasicBexp t
-  parseRelationalBexpInReverse (EquBoolExp left right) remaining
-parseRelationalBexpInReverse left t = return (left, t)
+  parseEquBoolExpInReverse (EquBoolExp left right) remaining
+parseEquBoolExpInReverse left t = return (left, t)
 
 parseBasicBexp :: [Token] -> Maybe (Bexp, [Token])
 parseBasicBexp (TTrue : tokens) = Just (TrueExp, tokens)
 parseBasicBexp (TFalse : tokens) = Just (FalseExp, tokens)
 parseBasicBexp (TNot : tokens) = do
-  (exp, rest) <- parseBexp tokens
+  (exp, rest) <- parseBasicBexp tokens
   return (NotExp exp, rest)
 parseBasicBexp tokens = parseRelationalAexp tokens
 

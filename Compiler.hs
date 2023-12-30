@@ -1,4 +1,4 @@
-module Compiler (compile, Aexp(..), Bexp(..), Stm(..), Program) where
+module Compiler where
 
 import Interpreter (Inst(..), Code)
 
