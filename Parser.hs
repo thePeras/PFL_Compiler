@@ -88,11 +88,6 @@ parseAexpTerm (TVar x : restTokens) = Just (Var x, restTokens)
 parseAexpTerm _ = Nothing
 
 parseBexp :: [Token] -> Maybe (Bexp, [Token])
-parseBexp tokens@(TLParen : _) = do
-  (exp, rest) <- parseBexp (drop 1 $ tokens) -- Ignore the TLParen and parse the expression inside
-  case rest of
-    (TRParen : remaining) -> return (exp, remaining)
-    _ -> Nothing -- Missing closing parenthesis
 parseBexp tokens = parseAndExp tokens
 
 parseAndExp :: [Token] -> Maybe (Bexp, [Token])
@@ -125,10 +120,14 @@ parseBasicBexp (TFalse : tokens) = Just (FalseExp, tokens)
 parseBasicBexp (TNot : tokens) = do
   (exp, rest) <- parseBasicBexp tokens
   return (NotExp exp, rest)
+parseBasicBexp (TLParen : tokens) = do
+  (exp, rest) <- parseAndExp tokens
+  case rest of
+    (TRParen : remaining) -> return (exp, remaining)
+    _ -> Nothing -- Missing closing parenthesis
 parseBasicBexp tokens = parseRelationalAexp tokens
 
 parseRelationalAexp :: [Token] -> Maybe (Bexp, [Token])
-parseRelationalAexp tokens@(TLParen : _) = parseBexp tokens -- If the expression starts with a parenthesis, parse it directly
 parseRelationalAexp tokens = do
   (left, rest) <- parseAexp tokens
   case rest of
@@ -139,7 +138,3 @@ parseRelationalAexp tokens = do
       (right, remaining) <- parseAexp t
       return (LeExp left right, remaining)
     _ -> Nothing -- Invalid relational expression
-
--- (problems with parenthesis)
---    ex: parseBexp (lexer "(2<=3) and (2 == 4)")
---    ex: parseBexp (lexer "(2 <= 5 = 3 == 4) and (2 <= 2)")
