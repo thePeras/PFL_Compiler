@@ -8,8 +8,20 @@ parse program = parseStm (lexer program)
 
 -- Helper predicate returning a tuple (ExtractedCode, RemaingCode)
 getCode :: [Token] -> ([Token], [Token])
-getCode (TLParen : t) = (takeWhile (/= TRParen) t, drop 1 $ dropWhile (/= TRParen) t)
+getCode (TLParen : t) = do
+    let (extractedCode, remaining) = getCodeToRParen t [] [TLParen]
+    (extractedCode, remaining)
 getCode t = (takeWhile (/= TSeq) t, drop 1 $ dropWhile (/= TSeq) t)
+
+-- Recursively extract code until the matching right parenthesis is found
+-- input: remaining code stack 
+-- output: (ExtractedCode, RemainingCode, Stack)
+getCodeToRParen :: [Token] -> [Token] -> [Token] -> ([Token], [Token])
+getCodeToRParen [] code stack = error "Run-time error"
+getCodeToRParen (TLParen : remaining) code stack = getCodeToRParen remaining (code ++ [TLParen]) (TLParen:stack)
+getCodeToRParen (TRParen : remaining) code (TLParen:[]) = (code, remaining)
+getCodeToRParen (TRParen : remaining) code (TLParen:stack) = getCodeToRParen remaining (code ++ [TRParen]) stack
+getCodeToRParen (x : remaining) code stack = getCodeToRParen remaining (code ++ [x]) stack
 
 parseStm :: [Token] -> Program
 parseStm [] = []
@@ -20,7 +32,7 @@ parseStm (TIf : t) =
             let code1 = joinStms (parseStm extractedCode1)
                 code2 = joinStms (parseStm extractedCode2)
             in If parsedCond code1 code2 : parseStm remaining
-        _ -> error "Run-time error: Invalid if statement"
+        _ -> error "Run-time error"
     where cond = takeWhile (/= TThen) t
           -- [(...) TThen (code1) TElse (code2)]
           afterThen = drop 1 $ dropWhile (/= TThen) t
@@ -34,7 +46,7 @@ parseStm (TWhile : t) =
         Just (parsedCond, []) ->
             let code = joinStms (parseStm extractedCode)
             in While parsedCond code : parseStm remaining
-        _ -> error "Run-time error: Invalid while statement1"
+        _ -> error "Run-time error"
     where cond = takeWhile (/= TDo) t
           -- [(...) TDo (code)]
           afterDo = drop 1 $ dropWhile (/= TDo) t
@@ -47,10 +59,10 @@ parseStm (TVar var : TAssign : t) =
 
 parseStm (TSeq : t) = parseStm t
 
-parseStm x = error $ "Run-time error: Invalid statement in parseStm: " ++ show x
+parseStm x = error $ "Run-time error"
 
 joinStms :: [Stm] -> Stm
-joinStms [] = error "Run-time error: Invalid statement in joinStms"
+joinStms [] = error "Run-time error"
 joinStms [stm] = stm
 joinStms (stm:stms) = Seq stm (joinStms stms)
 
@@ -120,11 +132,10 @@ parseBasicBexp (TFalse : tokens) = Just (FalseExp, tokens)
 parseBasicBexp (TNot : tokens) = do
   (exp, rest) <- parseBasicBexp tokens
   return (NotExp exp, rest)
-parseBasicBexp (TLParen : tokens) = do
-  (exp, rest) <- parseAndExp tokens
-  case rest of
-    (TRParen : remaining) -> return (exp, remaining)
-    _ -> Nothing -- Missing closing parenthesis
+parseBasicBexp (TLParen : tokens) = 
+  case parseBexp tokens of
+    Just (exp, TRParen : restTokens) -> Just (exp, restTokens)
+    _ -> Nothing
 parseBasicBexp tokens = parseRelationalAexp tokens
 
 parseRelationalAexp :: [Token] -> Maybe (Bexp, [Token])
