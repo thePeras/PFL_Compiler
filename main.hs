@@ -5,13 +5,15 @@ import Interpreter
 import Compiler
 import Lexer
 import Parser
-  
+
+
+-- main function to run the interpreter
 run :: (Code, Stack, State) -> (Code, Stack, State)
 run ([], stack, state) = ([], stack, state)
 run (x:xs, stack, state) = run (newCode, newStack, newState)
   where (newCode, newStack, newState) = interpret x (xs, stack, state)
 
--- To help you test your assembler
+-- To help test the assembler
 testAssembler :: Code -> (String, String)
 testAssembler code = (stack2Str stack, state2Str state)
   where (_,stack,state) = run(code, createEmptyStack, createEmptyState)
@@ -32,7 +34,7 @@ testAssembler code = (stack2Str stack, state2Str state)
 -- testAssembler [Tru,Tru,Store "y", Fetch "x",Tru]
 -- You should get an exception with the string: "Run-time error"
 
--- To help you test your parser
+-- To help test the parser
 testParser :: String -> (String, String)
 testParser programCode = (stack2Str stack, state2Str state)
   where (_,stack,state) = run(compile (parse programCode), createEmptyStack, createEmptyState)

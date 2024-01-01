@@ -12,13 +12,14 @@ data Inst =
 -- Definition of the Code type
 type Code = [Inst]
 
+-- function that based on the instruction given updates the stack and the state accordingly
 interpret :: Inst -> (Code, Stack, State) -> (Code, Stack, State)
 
--- Push
+-- Push Integer
 interpret (Push x) (code, stack, state) = 
   (code, IntElement x : stack, state)
 
--- Add
+-- Add 
 interpret Add (code, IntElement x : IntElement y : xs, state) = 
   (code, IntElement (x+y) : xs, state)
 interpret Add (code, stack, state) = error $ "Run-time error"
@@ -64,7 +65,7 @@ interpret Neg (code, BoolElement x : xs, state) =
   (code, BoolElement (not x) : xs, state)
 interpret Neg (code, stack, state) = error $ "Run-time error"
 
--- Fetch
+-- Fetch String
 interpret (Fetch key) (code, stack, state)
   | valueIsInt = (code, value : stack, state)
   | valueIsBool = (code, value : stack, state)
@@ -78,7 +79,7 @@ interpret (Fetch key) (code, stack, state)
       BoolElement _ -> True
       _ -> False
 
--- Store
+-- Store String
 interpret (Store key) (code, value : stack, state) = 
   (code, stack, insertValue key value state)
 
@@ -86,12 +87,12 @@ interpret (Store key) (code, value : stack, state) =
 interpret Noop (code, stack, state) = 
   (code, stack, state)
 
--- Branch
+-- Branch Code Code
 interpret (Branch code1 code2) (code, BoolElement x : xs, state)
   | x = (code1 ++ code, xs, state)
   | otherwise = (code2 ++ code, xs, state)
 interpret (Branch code1 code2) (code, stack, state) = error $ "Run-time error"
 
--- Loop
+-- Loop Code Code
 interpret (Loop cond code1) (code, stack, state) =
   (cond ++ [Branch (code1 ++ [Loop cond code1]) [Noop]], stack, state)
