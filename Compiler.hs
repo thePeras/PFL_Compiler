@@ -30,6 +30,7 @@ data Stm = Assign String Aexp
 -- Definition of the Program type
 type Program = [Stm]
 
+-- Compiles an arithmetic expression into a list of instructions
 compA :: Aexp -> Code
 compA (Num n)         = [Push n]
 compA (Var x)         = [Fetch x]
@@ -37,6 +38,7 @@ compA (AddExp x y)    = compA y ++ compA x ++ [Add]
 compA (SubExp x y)    = compA y ++ compA x ++ [Sub]
 compA (MultExp x y)   = compA y ++ compA x ++ [Mult]
 
+-- Compiles a boolean expression into a list of instructions
 compB :: Bexp -> Code
 compB TrueExp           = [Tru]
 compB FalseExp          = [Fals]
@@ -46,10 +48,13 @@ compB (LeExp x y)       = compA y ++ compA x ++ [Le]
 compB (AndExp x y)      = compB y ++ compB x ++ [And]
 compB (NotExp x)        = compB x ++ [Neg] 
 
+-- Compiles a program into a list of instructions
+-- Main function of this module
 compile :: Program -> Code
 compile [] = []
 compile (stm:stms) = compileStm stm ++ compile stms
 
+-- Compiles a individual statement into a list of instructions
 compileStm :: Stm -> Code
 compileStm (Assign x a)         = compA a ++ [Store x]
 compileStm (Seq stm1 stm2)      = compileStm stm1 ++ compileStm stm2

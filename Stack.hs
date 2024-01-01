@@ -7,13 +7,17 @@ data StackElement = IntElement Integer | BoolElement Bool
 -- Definition of the Stack type
 type Stack = [StackElement]
 
+
+-- Creating an empty Stack
 createEmptyStack :: Stack
 createEmptyStack = []
 
+-- Showing the element of the stack
 showValue :: StackElement -> String
 showValue (IntElement x) = show x
 showValue (BoolElement x) = show x
 
+-- Printing the stack
 stack2Str :: Stack -> String
 stack2Str [] = ""
 stack2Str [x] = showValue x

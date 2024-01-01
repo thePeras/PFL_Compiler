@@ -27,6 +27,7 @@ data Token = TInt Integer
            | TDo
            deriving (Show, Eq)
 
+-- Lexing a string into a list of tokens
 lexer :: String -> [Token]
 lexer [] = []
 lexer input@(c:cs)
