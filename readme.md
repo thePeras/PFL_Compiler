@@ -8,7 +8,7 @@
 ><br />
 > Faculty: **FEUP** (Faculty of Engineering of the University of Porto)
 ><br />
-> Report: 
+> Report: [report.pdf](./report.pdf)
 ><br/>
 > Project evaluation: **_**/20
 
@@ -20,3 +20,6 @@
 2. Design a compiler for a small imperative programming language with arithmetic and boolean expressions, assignments, sequences of statements, if-then-else statements, and while loops. 
 The compiler translates programs written in this language into lists of machine instructions. 
 The task includes defining **data structures in Haskell** to represent expressions and statements, developing a **compiler** function, and creating a **parser** to transform string representations of programs into corresponding imperative language structures. The parser handles syntax rules, variable naming, operator precedence in arithmetic and boolean expressions, and enforces proper execution order of operations by using **tokens** produced by a **lexer**.
+
+You can read more about the goals in the [project assignment](./Assignment.pdf).
+Implementation details can be found in the [report](./report.pdf) and the [source code](./src/).
