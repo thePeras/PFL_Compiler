@@ -10,7 +10,7 @@
 ><br />
 > Report: [report.pdf](./report.pdf)
 ><br/>
-> Project evaluation: **_**/20
+> Project evaluation: **19**/20
 
 
 ## Project Goals
